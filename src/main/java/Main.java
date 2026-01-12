@@ -15,60 +15,67 @@ public class Main {
 
         // --- LOGIN ---
         app.post("/api/login", ctx -> {
-            Map<String, String> body = ctx.bodyAsClass(Map.class);
-            String nick = String.valueOf(body.get("nickname")).toLowerCase().trim();
-            String pass = String.valueOf(body.get("password"));
+            try {
+                Map<String, Object> body = ctx.bodyAsClass(Map.class);
+                String nick = String.valueOf(body.get("nickname")).toLowerCase().trim();
+                String pass = String.valueOf(body.get("password")).trim();
 
-            try (Connection conn = DatabaseConfig.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
-                pstmt.setString(1, nick);
-                pstmt.setString(2, pass);
-                ResultSet rs = pstmt.executeQuery();
+                try (Connection conn = DatabaseConfig.getConnection();
+                     PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
+                    pstmt.setString(1, nick);
+                    pstmt.setString(2, pass);
+                    ResultSet rs = pstmt.executeQuery();
 
-                if (rs.next()) {
-                    Map<String, Object> user = new HashMap<>();
-                    user.put("nickname", rs.getString("nickname"));
-                    user.put("fullName", rs.getString("full_name"));
-                    user.put("role", rs.getString("role"));
-                    ctx.json(Map.of("success", true, "user", user));
-                } else {
-                    ctx.json(Map.of("success", false, "message", "Nikneym və ya şifrə səhvdir!"));
+                    if (rs.next()) {
+                        ctx.json(Map.of("success", true, "user", Map.of(
+                            "nickname", rs.getString("nickname"),
+                            "fullName", rs.getString("full_name"),
+                            "role", rs.getString("role")
+                        )));
+                    } else {
+                        ctx.json(Map.of("success", false, "message", "Nikneym və ya şifrə səhvdir!"));
+                    }
                 }
             } catch (Exception e) {
-                ctx.json(Map.of("success", false, "message", "Xəta: " + e.getMessage()));
+                e.printStackTrace();
+                ctx.status(500).json(Map.of("success", false, "message", "Server xətası: " + e.getMessage()));
             }
         });
 
         // --- REGISTER ---
         app.post("/api/register", ctx -> {
-            Map<String, String> body = ctx.bodyAsClass(Map.class);
-            String nick = String.valueOf(body.get("nickname")).toLowerCase().trim();
-            String name = String.valueOf(body.get("fullName"));
-            String pass = String.valueOf(body.get("password"));
+            try {
+                Map<String, Object> body = ctx.bodyAsClass(Map.class);
+                String nick = String.valueOf(body.get("nickname")).toLowerCase().trim();
+                String name = String.valueOf(body.get("fullName")).trim();
+                String pass = String.valueOf(body.get("password")).trim();
 
-            if (nick.isEmpty() || name.isEmpty() || pass.isEmpty()) {
-                ctx.json(Map.of("success", false, "message", "Bütün xanaları doldurun!"));
-                return;
-            }
+                if (nick.isEmpty() || name.isEmpty() || pass.isEmpty()) {
+                    ctx.json(Map.of("success", false, "message", "Xanaları doldurun!"));
+                    return;
+                }
 
-            try (Connection conn = DatabaseConfig.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users (nickname, full_name, password, role) VALUES (?, ?, ?, ?)")) {
-                pstmt.setString(1, nick);
-                pstmt.setString(2, name);
-                pstmt.setString(3, pass);
-                pstmt.setString(4, "STUDENT");
-                pstmt.executeUpdate();
-                ctx.json(Map.of("success", true));
+                try (Connection conn = DatabaseConfig.getConnection();
+                     PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users (nickname, full_name, password, role) VALUES (?, ?, ?, ?)")) {
+                    pstmt.setString(1, nick);
+                    pstmt.setString(2, name);
+                    pstmt.setString(3, pass);
+                    pstmt.setString(4, "STUDENT");
+                    pstmt.executeUpdate();
+                    ctx.json(Map.of("success", true));
+                }
             } catch (SQLException e) {
                 ctx.json(Map.of("success", false, "message", "Bu nikneym artıq istifadə olunub!"));
+            } catch (Exception e) {
+                e.printStackTrace();
+                ctx.status(500).json(Map.of("success", false, "message", "Qeydiyyat xətası"));
             }
         });
 
-        // --- TASKS API ---
+        // --- DİGƏR METODLAR ---
         app.get("/api/tasks", ctx -> {
             List<Map<String, String>> tasks = new ArrayList<>();
-            try (Connection conn = DatabaseConfig.getConnection();
-                 Statement stmt = conn.createStatement();
+            try (Connection conn = DatabaseConfig.getConnection(); Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("SELECT * FROM tasks ORDER BY updated_at DESC")) {
                 while (rs.next()) {
                     Map<String, String> t = new HashMap<>();
@@ -87,36 +94,32 @@ public class Main {
         });
 
         app.post("/api/tasks/add", ctx -> {
-            Map<String, String> t = ctx.bodyAsClass(Map.class);
-            String id = UUID.randomUUID().toString();
-            String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-
-            try (Connection conn = DatabaseConfig.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
-                pstmt.setString(1, id);
-                pstmt.setString(2, t.get("ownerNickname"));
-                pstmt.setString(3, t.get("userFullName"));
-                pstmt.setString(4, t.get("title"));
-                pstmt.setString(5, t.get("lesson"));
-                pstmt.setString(6, "In Progress");
-                pstmt.setString(7, t.get("fileName"));
-                pstmt.setString(8, time);
-                pstmt.executeUpdate();
-                ctx.status(201).json(Map.of("success", true));
-            } catch (Exception e) {
-                ctx.status(500).json(Map.of("success", false, "message", e.getMessage()));
-            }
+            try {
+                Map<String, String> t = ctx.bodyAsClass(Map.class);
+                String id = UUID.randomUUID().toString();
+                String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+                try (Connection conn = DatabaseConfig.getConnection();
+                     PreparedStatement pstmt = conn.prepareStatement("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                    pstmt.setString(1, id);
+                    pstmt.setString(2, t.get("ownerNickname"));
+                    pstmt.setString(3, t.get("userFullName"));
+                    pstmt.setString(4, t.get("title"));
+                    pstmt.setString(5, t.get("lesson"));
+                    pstmt.setString(6, "In Progress");
+                    pstmt.setString(7, t.get("fileName"));
+                    pstmt.setString(8, time);
+                    pstmt.executeUpdate();
+                    ctx.status(201).json(Map.of("success", true));
+                }
+            } catch (Exception e) { e.printStackTrace(); ctx.status(500); }
         });
 
         app.get("/api/users", ctx -> {
             List<Map<String, String>> users = new ArrayList<>();
-            try (Connection conn = DatabaseConfig.getConnection();
-                 Statement stmt = conn.createStatement();
+            try (Connection conn = DatabaseConfig.getConnection(); Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
                 while (rs.next()) {
-                    users.add(Map.of("nickname", rs.getString("nickname"),
-                            "fullName", rs.getString("full_name"),
-                            "role", rs.getString("role")));
+                    users.add(Map.of("nickname", rs.getString("nickname"), "fullName", rs.getString("full_name"), "role", rs.getString("role")));
                 }
                 ctx.json(users);
             }
