@@ -6,56 +6,65 @@ import java.time.format.DateTimeFormatter;
 
 public class Main {
     public static void main(String[] args) {
-        // Bazanı işə sal
         DatabaseConfig.initializeDatabase();
 
-        // Render-in təyin etdiyi portu mütləq götürməliyik
-        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
-
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8081"));
         var app = Javalin.create(config -> {
             config.staticFiles.add("/public");
         }).start(port);
 
-        // API Marşrutları
+        // --- LOGIN ---
         app.post("/api/login", ctx -> {
             Map<String, String> body = ctx.bodyAsClass(Map.class);
-            String nick = body.get("nickname").toLowerCase().trim();
-            String pass = body.get("password");
+            String nick = String.valueOf(body.get("nickname")).toLowerCase().trim();
+            String pass = String.valueOf(body.get("password"));
 
             try (Connection conn = DatabaseConfig.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
                 pstmt.setString(1, nick);
                 pstmt.setString(2, pass);
                 ResultSet rs = pstmt.executeQuery();
+
                 if (rs.next()) {
-                    ctx.json(Map.of("success", true, "user", Map.of(
-                        "nickname", rs.getString("nickname"),
-                        "fullName", rs.getString("full_name"),
-                        "role", rs.getString("role")
-                    )));
+                    Map<String, Object> user = new HashMap<>();
+                    user.put("nickname", rs.getString("nickname"));
+                    user.put("fullName", rs.getString("full_name"));
+                    user.put("role", rs.getString("role"));
+                    ctx.json(Map.of("success", true, "user", user));
                 } else {
-                    ctx.json(Map.of("success", false, "message", "Məlumatlar tapılmadı"));
+                    ctx.json(Map.of("success", false, "message", "Nikneym və ya şifrə səhvdir!"));
                 }
+            } catch (Exception e) {
+                ctx.json(Map.of("success", false, "message", "Xəta: " + e.getMessage()));
             }
         });
 
+        // --- REGISTER ---
         app.post("/api/register", ctx -> {
             Map<String, String> body = ctx.bodyAsClass(Map.class);
-            String nick = body.get("nickname").toLowerCase().trim();
+            String nick = String.valueOf(body.get("nickname")).toLowerCase().trim();
+            String name = String.valueOf(body.get("fullName"));
+            String pass = String.valueOf(body.get("password"));
+
+            if (nick.isEmpty() || name.isEmpty() || pass.isEmpty()) {
+                ctx.json(Map.of("success", false, "message", "Bütün xanaları doldurun!"));
+                return;
+            }
+
             try (Connection conn = DatabaseConfig.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?)")) {
+                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users (nickname, full_name, password, role) VALUES (?, ?, ?, ?)")) {
                 pstmt.setString(1, nick);
-                pstmt.setString(2, body.get("fullName"));
-                pstmt.setString(3, body.get("password"));
+                pstmt.setString(2, name);
+                pstmt.setString(3, pass);
                 pstmt.setString(4, "STUDENT");
                 pstmt.executeUpdate();
                 ctx.json(Map.of("success", true));
             } catch (SQLException e) {
-                ctx.json(Map.of("success", false, "message", "Xəta baş verdi"));
+                ctx.json(Map.of("success", false, "message", "Bu nikneym artıq istifadə olunub!"));
             }
         });
 
-        // Digər API-lar (Tasks) olduğu kimi qalır
+        // --- TASKS API ---
         app.get("/api/tasks", ctx -> {
             List<Map<String, String>> tasks = new ArrayList<>();
             try (Connection conn = DatabaseConfig.getConnection();
@@ -81,6 +90,7 @@ public class Main {
             Map<String, String> t = ctx.bodyAsClass(Map.class);
             String id = UUID.randomUUID().toString();
             String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+
             try (Connection conn = DatabaseConfig.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
                 pstmt.setString(1, id);
@@ -92,7 +102,9 @@ public class Main {
                 pstmt.setString(7, t.get("fileName"));
                 pstmt.setString(8, time);
                 pstmt.executeUpdate();
-                ctx.status(201);
+                ctx.status(201).json(Map.of("success", true));
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("success", false, "message", e.getMessage()));
             }
         });
 
