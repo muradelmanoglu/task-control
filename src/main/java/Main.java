@@ -6,77 +6,56 @@ import java.time.format.DateTimeFormatter;
 
 public class Main {
     public static void main(String[] args) {
+        // Bazanı işə sal
         DatabaseConfig.initializeDatabase();
 
-        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8081"));
+        // Render-in təyin etdiyi portu mütləq götürməliyik
+        int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
+
         var app = Javalin.create(config -> {
             config.staticFiles.add("/public");
         }).start(port);
 
-        // --- LOGIN ---
+        // API Marşrutları
         app.post("/api/login", ctx -> {
-            try {
-                Map<String, String> body = ctx.bodyAsClass(Map.class);
-                String nick = body.get("nickname").toLowerCase().trim();
-                String pass = body.get("password");
+            Map<String, String> body = ctx.bodyAsClass(Map.class);
+            String nick = body.get("nickname").toLowerCase().trim();
+            String pass = body.get("password");
 
-                try (Connection conn = DatabaseConfig.getConnection();
-                     PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
-                    pstmt.setString(1, nick);
-                    pstmt.setString(2, pass);
-                    ResultSet rs = pstmt.executeQuery();
-
-                    if (rs.next()) {
-                        Map<String, Object> user = new HashMap<>();
-                        user.put("nickname", rs.getString("nickname"));
-                        user.put("fullName", rs.getString("full_name"));
-                        user.put("role", rs.getString("role"));
-                        ctx.json(Map.of("success", true, "user", user));
-                    } else {
-                        ctx.json(Map.of("success", false, "message", "Məlumatlar yanlışdır!"));
-                    }
-                }
-            } catch (Exception e) {
-                ctx.status(500).json(Map.of("success", false, "message", "Server xətası!"));
-            }
-        });
-
-        // --- REGISTER ---
-        app.post("/api/register", ctx -> {
-            try {
-                Map<String, String> body = ctx.bodyAsClass(Map.class);
-                String nick = body.get("nickname").toLowerCase().trim();
-                
-                try (Connection conn = DatabaseConfig.getConnection();
-                     PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?)")) {
-                    pstmt.setString(1, nick);
-                    pstmt.setString(2, body.get("fullName"));
-                    pstmt.setString(3, body.get("password"));
-                    pstmt.setString(4, "STUDENT");
-                    pstmt.executeUpdate();
-                    ctx.json(Map.of("success", true));
-                }
-            } catch (SQLException e) {
-                ctx.json(Map.of("success", false, "message", "Bu nikneym artıq mövcuddur!"));
-            }
-        });
-
-        // --- FETCH ALL USERS ---
-        app.get("/api/users", ctx -> {
-            List<Map<String, String>> users = new ArrayList<>();
             try (Connection conn = DatabaseConfig.getConnection();
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
-                while (rs.next()) {
-                    users.add(Map.of("nickname", rs.getString("nickname"),
-                            "fullName", rs.getString("full_name"),
-                            "role", rs.getString("role")));
+                 PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
+                pstmt.setString(1, nick);
+                pstmt.setString(2, pass);
+                ResultSet rs = pstmt.executeQuery();
+                if (rs.next()) {
+                    ctx.json(Map.of("success", true, "user", Map.of(
+                        "nickname", rs.getString("nickname"),
+                        "fullName", rs.getString("full_name"),
+                        "role", rs.getString("role")
+                    )));
+                } else {
+                    ctx.json(Map.of("success", false, "message", "Məlumatlar tapılmadı"));
                 }
-                ctx.json(users);
             }
         });
 
-        // --- TASKS: GET ---
+        app.post("/api/register", ctx -> {
+            Map<String, String> body = ctx.bodyAsClass(Map.class);
+            String nick = body.get("nickname").toLowerCase().trim();
+            try (Connection conn = DatabaseConfig.getConnection();
+                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?)")) {
+                pstmt.setString(1, nick);
+                pstmt.setString(2, body.get("fullName"));
+                pstmt.setString(3, body.get("password"));
+                pstmt.setString(4, "STUDENT");
+                pstmt.executeUpdate();
+                ctx.json(Map.of("success", true));
+            } catch (SQLException e) {
+                ctx.json(Map.of("success", false, "message", "Xəta baş verdi"));
+            }
+        });
+
+        // Digər API-lar (Tasks) olduğu kimi qalır
         app.get("/api/tasks", ctx -> {
             List<Map<String, String>> tasks = new ArrayList<>();
             try (Connection conn = DatabaseConfig.getConnection();
@@ -98,12 +77,10 @@ public class Main {
             }
         });
 
-        // --- TASKS: ADD ---
         app.post("/api/tasks/add", ctx -> {
             Map<String, String> t = ctx.bodyAsClass(Map.class);
             String id = UUID.randomUUID().toString();
             String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
-
             try (Connection conn = DatabaseConfig.getConnection();
                  PreparedStatement pstmt = conn.prepareStatement("INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
                 pstmt.setString(1, id);
@@ -119,7 +96,20 @@ public class Main {
             }
         });
 
-        // --- TASKS: UPDATE STATUS ---
+        app.get("/api/users", ctx -> {
+            List<Map<String, String>> users = new ArrayList<>();
+            try (Connection conn = DatabaseConfig.getConnection();
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
+                while (rs.next()) {
+                    users.add(Map.of("nickname", rs.getString("nickname"),
+                            "fullName", rs.getString("full_name"),
+                            "role", rs.getString("role")));
+                }
+                ctx.json(users);
+            }
+        });
+
         app.post("/api/tasks/status", ctx -> {
             Map<String, String> body = ctx.bodyAsClass(Map.class);
             try (Connection conn = DatabaseConfig.getConnection();
@@ -131,7 +121,6 @@ public class Main {
             }
         });
 
-        // --- TASKS: DELETE ---
         app.post("/api/tasks/delete", ctx -> {
             String id = ctx.queryParam("id");
             try (Connection conn = DatabaseConfig.getConnection();
