@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CODE POLİS | Professional Task System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .active-done { background-color: #16a34a !important; color: white !important; box-shadow: 0 0 15px rgba(22, 163, 74, 0.4); }
+        .active-nok { background-color: #dc2626 !important; color: white !important; box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
+        .active-progress { background-color: #ca8a04 !important; color: white !important; box-shadow: 0 0 15px rgba(202, 138, 4, 0.4); }
+    </style>
+</head>
+<body class="bg-[#0d1117] text-gray-300 font-sans">
+<div id="app" class="min-h-screen">
+
+    <div v-if="!user" class="flex items-center justify-center min-h-screen px-4">
+        <div class="max-w-md w-full bg-[#161b22] p-8 rounded-2xl border border-gray-800 shadow-2xl">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-black text-white tracking-tighter">CODE <span class="text-blue-500">POLİS</span></h1>
+                <p class="text-gray-500 text-sm mt-2 uppercase tracking-widest">{{ isLogin ? 'Sistemə Giriş' : 'Yeni Hesab Yarat' }}</p>
+            </div>
+
+            <div class="flex bg-[#0d1117] p-1 rounded-lg mb-6">
+                <button @click="isLogin = true" :class="isLogin ? 'bg-[#30363d] text-white' : ''" class="flex-1 py-2 rounded-md text-sm font-bold transition">Giriş</button>
+                <button @click="isLogin = false" :class="!isLogin ? 'bg-[#30363d] text-white' : ''" class="flex-1 py-2 rounded-md text-sm font-bold transition">Qeydiyyat</button>
+            </div>
+
+            <div v-if="!isLogin" class="space-y-4">
+                <input v-model="regForm.fullName" type="text" placeholder="Ad Soyad" class="w-full p-3 bg-[#0d1117] border border-gray-700 rounded-lg text-white outline-none focus:border-blue-500 transition">
+                <input v-model="regForm.nickname" type="text" placeholder="Nikneym" class="w-full p-3 bg-[#0d1117] border border-gray-700 rounded-lg text-white outline-none focus:border-blue-500 transition">
+                <input v-model="regForm.password" type="password" placeholder="Şifrə" class="w-full p-3 bg-[#0d1117] border border-gray-700 rounded-lg text-white outline-none focus:border-blue-500 transition">
+                <button @click="register" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold p-3 rounded-lg transition uppercase mt-2">Hesabı Tamamla</button>
+            </div>
+
+            <div v-else class="space-y-4">
+                <input v-model="loginForm.nickname" type="text" placeholder="Nikneym" class="w-full p-3 bg-[#0d1117] border border-gray-700 rounded-lg text-white outline-none focus:border-blue-500 transition">
+                <input v-model="loginForm.password" type="password" placeholder="Şifrə" class="w-full p-3 bg-[#0d1117] border border-gray-700 rounded-lg text-white outline-none focus:border-blue-500 transition">
+                <button @click="login" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition uppercase mt-2">Daxil Ol</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-else>
+        <nav class="bg-[#161b22] border-b border-gray-800 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-black text-white tracking-tighter">CODE <span class="text-blue-500">POLİS</span></h1>
+                <span class="bg-gray-800 text-[10px] px-2 py-1 rounded-md text-gray-400 font-bold uppercase">{{ user.role }}</span>
+            </div>
+            <div class="flex items-center gap-6">
+                <span class="text-sm font-medium hidden md:block text-gray-400">Xoş gəldin, <span class="text-white">{{ user.fullName }}</span></span>
+                <button @click="logout" class="bg-red-500/10 text-red-500 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white transition">ÇIXIŞ</button>
+            </div>
+        </nav>
+
+        <main class="p-6 max-w-6xl mx-auto">
+
+            <div v-if="user.role === 'STUDENT'" class="grid gap-8">
+                <section class="bg-[#161b22] p-6 rounded-2xl border border-gray-800 shadow-lg">
+                    <h3 class="text-white font-bold mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-blue-500"></i> Yeni Tapşırıq Göndər
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <input v-model="newTask.title" placeholder="Tapşırıq adı" class="md:col-span-2 p-3 bg-[#0d1117] border border-gray-700 rounded-lg outline-none focus:border-blue-500">
+                        <input v-model="newTask.lesson" placeholder="Dərs №" class="p-3 bg-[#0d1117] border border-gray-700 rounded-lg outline-none focus:border-blue-500">
+                        <input v-model="newTask.fileName" placeholder="GitHub Link və ya Fayl adı" class="p-3 bg-[#0d1117] border border-gray-700 rounded-lg outline-none focus:border-blue-500">
+                    </div>
+                    <button @click="addTask" class="mt-4 w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3 rounded-lg transition">GÖNDƏR</button>
+                </section>
+
+                <section class="bg-[#161b22] rounded-2xl border border-gray-800 overflow-hidden shadow-lg">
+                    <div class="p-4 border-b border-gray-800 bg-black/10">
+                        <h3 class="text-sm font-bold uppercase tracking-widest text-gray-400">Mənim Tapşırıqlarım</h3>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead class="text-[10px] text-gray-500 uppercase">
+                        <tr><th class="p-4">Tapşırıq</th><th class="p-4">Dərs</th><th class="p-4">Fayl</th><th class="p-4 text-center">Status</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800">
+                        <tr v-for="t in myTasks" class="hover:bg-white/5 transition">
+                            <td class="p-4 font-bold text-white">{{ t.title }}</td>
+                            <td class="p-4 text-sm text-gray-400">{{ t.lesson }}</td>
+                            <td class="p-4 text-xs font-mono text-blue-400">{{ t.fileName }}</td>
+                            <td class="p-4 text-center">
+                                        <span :class="getStatusClass(t.status)" class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">
+                                            {{ t.status }}
+                                        </span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            <div v-if="user.role === 'ADMIN'" class="grid gap-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xl font-bold text-white">Tələbə Qovluqları (Siyahı)</h2>
+                    <span class="text-xs text-gray-500 uppercase">Aktiv Tələbələr: {{ studentUsers.length }}</span>
+                </div>
+
+                <div v-for="s in studentUsers" :key="s.nickname" class="bg-[#161b22] border border-gray-800 rounded-xl overflow-hidden shadow-sm mb-2">
+                    <button @click="toggleFolder(s.nickname)" class="w-full p-4 flex justify-between items-center hover:bg-white/5 transition">
+                        <div class="flex items-center gap-4">
+                            <i :class="openFolders[s.nickname] ? 'fa-folder-open text-blue-500' : 'fa-folder text-yellow-500'" class="fa-solid text-lg"></i>
+                            <span class="font-bold text-white text-lg">{{ s.fullName }}</span>
+                            <span class="text-[10px] bg-gray-800 text-gray-500 px-3 py-1 rounded-full font-mono">{{ getStudentTasks(s.nickname).length }} TASK</span>
+                        </div>
+                        <i :class="openFolders[s.nickname] ? 'fa-chevron-up' : 'fa-chevron-down'" class="fa-solid text-xs text-gray-600"></i>
+                    </button>
+
+                    <div v-if="openFolders[s.nickname]" class="bg-black/20 border-t border-gray-800">
+                        <div v-for="t in getStudentTasks(s.nickname)" :key="t.id" class="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:bg-white/5 transition border-b border-gray-800 last:border-0">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-3">
+                                    <h4 class="text-white font-bold truncate">{{ t.title }}</h4>
+                                    <span class="text-[9px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded italic">Dərs: {{ t.lesson }}</span>
+                                </div>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <i class="fa-solid fa-link text-[10px] text-blue-500"></i>
+                                    <a :href="t.fileName.startsWith('http') ? t.fileName : '#'"
+                                       @click="!t.fileName.startsWith('http') ? alert('Bu fayl lokal yaddaşdadır: ' + t.fileName) : null"
+                                       target="_blank"
+                                       class="text-[11px] font-mono text-blue-400 hover:underline cursor-pointer">
+                                        {{ t.fileName }}
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 bg-[#0d1117] p-1.5 rounded-xl border border-gray-800">
+                                <button @click="updateStatus(t.id, 'Done')"
+                                        :class="t.status === 'Done' ? 'active-done' : 'text-gray-500 hover:text-green-500'"
+                                        class="px-4 py-1.5 rounded-lg text-[10px] font-black transition-all duration-300 uppercase">
+                                    Done
+                                </button>
+                                <button @click="updateStatus(t.id, 'NOK')"
+                                        :class="t.status === 'NOK' ? 'active-nok' : 'text-gray-500 hover:text-red-500'"
+                                        class="px-4 py-1.5 rounded-lg text-[10px] font-black transition-all duration-300 uppercase">
+                                    NOK
+                                </button>
+                                <button @click="updateStatus(t.id, 'In Progress')"
+                                        :class="t.status === 'In Progress' ? 'active-progress' : 'text-gray-500 hover:text-yellow-500'"
+                                        class="px-4 py-1.5 rounded-lg text-[10px] font-black transition-all duration-300 uppercase">
+                                    Wait
+                                </button>
+                                <div class="w-[1px] h-4 bg-gray-800 mx-1"></div>
+                                <button @click="deleteTask(t.id)" class="px-2 text-gray-600 hover:text-red-500 transition">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="getStudentTasks(s.nickname).length === 0" class="p-6 text-center text-gray-600 italic text-sm">Bu tələbə hələ tapşırıq göndərməyib.</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                isLogin: true,
+                user: null,
+                loginForm: { nickname: '', password: '' },
+                regForm: { fullName: '', nickname: '', password: '' },
+                newTask: { title: '', lesson: '', fileName: '' },
+                myTasks: [],
+                allTasks: [],
+                allUsers: [],
+                openFolders: {}
+            }
+        },
+        computed: {
+            studentUsers() { return this.allUsers.filter(u => u.role === 'STUDENT'); }
+        },
+        methods: {
+            async login() {
+                const res = await fetch('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(this.loginForm) });
+                const data = await res.json();
+                if (data.success) { this.user = data.user; this.refreshData(); } else alert("Məlumatlar yanlışdır!");
+            },
+            async register() {
+                const res = await fetch('/api/register', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(this.regForm) });
+                const data = await res.json();
+                if (data.success) { alert("Qeydiyyat tamamlandı!"); this.isLogin = true; } else alert(data.message);
+            },
+            async refreshData() {
+                const [tRes, uRes] = await Promise.all([fetch('/api/tasks'), fetch('/api/users')]);
+                this.allTasks = await tRes.json();
+                this.allUsers = await uRes.json();
+                if (this.user.role === 'STUDENT') {
+                    this.myTasks = this.allTasks.filter(t => t.ownerNickname === this.user.nickname);
+                }
+            },
+            async addTask() {
+                if(!this.newTask.title || !this.newTask.lesson) return alert("Boş buraxmayın!");
+                const task = { ...this.newTask, ownerNickname: this.user.nickname, userFullName: this.user.fullName };
+                await fetch('/api/tasks/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(task) });
+                this.newTask = { title: '', lesson: '', fileName: '' };
+                this.refreshData();
+            },
+            async updateStatus(id, status) {
+                await fetch('/api/tasks/status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ id, status })
+                });
+                this.refreshData();
+            },
+            async deleteTask(id) {
+                if(confirm("Silinsin?")) {
+                    await fetch(`/api/tasks/delete?id=${id}`, { method: 'POST' });
+                    this.refreshData();
+                }
+            },
+            toggleFolder(nick) { this.openFolders[nick] = !this.openFolders[nick]; },
+            getStudentTasks(nick) { return this.allTasks.filter(t => t.ownerNickname === nick); },
+            getStatusClass(status) {
+                if (status === 'Done') return 'bg-green-500/20 text-green-500 border border-green-500/50';
+                if (status === 'NOK') return 'bg-red-500/20 text-red-500 border border-red-500/50';
+                return 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50';
+            },
+            logout() { this.user = null; this.loginForm = { nickname: '', password: '' }; }
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>
