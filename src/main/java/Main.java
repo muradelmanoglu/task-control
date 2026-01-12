@@ -1,4 +1,3 @@
-
 import io.javalin.Javalin;
 import java.sql.*;
 import java.util.*;
@@ -7,7 +6,6 @@ import java.time.format.DateTimeFormatter;
 
 public class Main {
     public static void main(String[] args) {
-        // 1. Bazanı və cədvəlləri işə sal
         DatabaseConfig.initializeDatabase();
 
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8081"));
@@ -15,49 +13,55 @@ public class Main {
             config.staticFiles.add("/public");
         }).start(port);
 
-        System.out.println("🚀 CODE POLİS sistemi " + port + " portunda aktivdir!");
-
         // --- LOGIN ---
         app.post("/api/login", ctx -> {
-            Map<String, String> body = ctx.bodyAsClass(Map.class);
-            String nick = body.get("nickname");
-            String pass = body.get("password");
+            try {
+                Map<String, String> body = ctx.bodyAsClass(Map.class);
+                String nick = body.get("nickname").toLowerCase().trim();
+                String pass = body.get("password");
 
-            try (Connection conn = DatabaseConfig.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
-                pstmt.setString(1, nick);
-                pstmt.setString(2, pass);
-                ResultSet rs = pstmt.executeQuery();
+                try (Connection conn = DatabaseConfig.getConnection();
+                     PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM users WHERE nickname = ? AND password = ?")) {
+                    pstmt.setString(1, nick);
+                    pstmt.setString(2, pass);
+                    ResultSet rs = pstmt.executeQuery();
 
-                if (rs.next()) {
-                    Map<String, Object> user = new HashMap<>();
-                    user.put("nickname", rs.getString("nickname"));
-                    user.put("fullName", rs.getString("full_name"));
-                    user.put("role", rs.getString("role"));
-                    ctx.json(Map.of("success", true, "user", user));
-                } else {
-                    ctx.json(Map.of("success", false, "message", "Nikneym və ya şifrə səhvdir!"));
+                    if (rs.next()) {
+                        Map<String, Object> user = new HashMap<>();
+                        user.put("nickname", rs.getString("nickname"));
+                        user.put("fullName", rs.getString("full_name"));
+                        user.put("role", rs.getString("role"));
+                        ctx.json(Map.of("success", true, "user", user));
+                    } else {
+                        ctx.json(Map.of("success", false, "message", "Məlumatlar yanlışdır!"));
+                    }
                 }
+            } catch (Exception e) {
+                ctx.status(500).json(Map.of("success", false, "message", "Server xətası!"));
             }
         });
 
         // --- REGISTER ---
         app.post("/api/register", ctx -> {
-            Map<String, String> body = ctx.bodyAsClass(Map.class);
-            try (Connection conn = DatabaseConfig.getConnection();
-                 PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?)")) {
-                pstmt.setString(1, body.get("nickname"));
-                pstmt.setString(2, body.get("fullName"));
-                pstmt.setString(3, body.get("password"));
-                pstmt.setString(4, "STUDENT");
-                pstmt.executeUpdate();
-                ctx.json(Map.of("success", true));
+            try {
+                Map<String, String> body = ctx.bodyAsClass(Map.class);
+                String nick = body.get("nickname").toLowerCase().trim();
+                
+                try (Connection conn = DatabaseConfig.getConnection();
+                     PreparedStatement pstmt = conn.prepareStatement("INSERT INTO users VALUES (?, ?, ?, ?)")) {
+                    pstmt.setString(1, nick);
+                    pstmt.setString(2, body.get("fullName"));
+                    pstmt.setString(3, body.get("password"));
+                    pstmt.setString(4, "STUDENT");
+                    pstmt.executeUpdate();
+                    ctx.json(Map.of("success", true));
+                }
             } catch (SQLException e) {
-                ctx.json(Map.of("success", false, "message", "Bu nikneym artıq istifadə olunub!"));
+                ctx.json(Map.of("success", false, "message", "Bu nikneym artıq mövcuddur!"));
             }
         });
 
-        // --- FETCH ALL USERS (Admin üçün) ---
+        // --- FETCH ALL USERS ---
         app.get("/api/users", ctx -> {
             List<Map<String, String>> users = new ArrayList<>();
             try (Connection conn = DatabaseConfig.getConnection();
@@ -115,7 +119,7 @@ public class Main {
             }
         });
 
-        // --- TASKS: UPDATE STATUS (Müəllim üçün) ---
+        // --- TASKS: UPDATE STATUS ---
         app.post("/api/tasks/status", ctx -> {
             Map<String, String> body = ctx.bodyAsClass(Map.class);
             try (Connection conn = DatabaseConfig.getConnection();
