@@ -1,4 +1,3 @@
-
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -7,11 +6,24 @@ import java.sql.Statement;
 public class DatabaseConfig {
     public static Connection getConnection() throws SQLException {
         String dbUrl = System.getenv("DB_URL");
-        if (dbUrl == null) {
-            // Skrinşotda görünən məlumatlara əsasən:
-            // Port: 5432, Database: muradelmanoglu, User: muradelmanoglu
+        
+        if (dbUrl == null || dbUrl.isEmpty()) {
+            // Lokal yoxlama üçün
             return DriverManager.getConnection("jdbc:postgresql://localhost:5432/muradelmanoglu", "muradelmanoglu", "");
         }
+
+        // Render-in verdiyi "postgres://" formatını "jdbc:postgresql://" formatına çeviririk
+        if (dbUrl.startsWith("postgres://")) {
+            dbUrl = dbUrl.replace("postgres://", "jdbc:postgresql://");
+        }
+        
+        // Render bazası üçün SSL mütləqdir
+        if (!dbUrl.contains("?")) {
+            dbUrl += "?sslmode=require";
+        } else if (!dbUrl.contains("sslmode")) {
+            dbUrl += "&sslmode=require";
+        }
+
         return DriverManager.getConnection(dbUrl);
     }
 
@@ -24,7 +36,7 @@ public class DatabaseConfig {
                     "password TEXT, " +
                     "role TEXT)");
 
-            // Tapşırıqlar cədvəli (id-ni serial və ya text edə bilərik, burada UUID/Text istifadə edirik)
+            // Tapşırıqlar cədvəli
             stmt.execute("CREATE TABLE IF NOT EXISTS tasks (" +
                     "id TEXT PRIMARY KEY, " +
                     "owner_nickname TEXT REFERENCES users(nickname), " +
@@ -38,6 +50,7 @@ public class DatabaseConfig {
             System.out.println("✅ Verilənlər bazası və cədvəllər uğurla hazırlandı!");
         } catch (SQLException e) {
             System.err.println("❌ Baza xətası: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }
