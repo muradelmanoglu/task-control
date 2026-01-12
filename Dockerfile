@@ -3,6 +3,6 @@ COPY . .
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:17-jdk-jammy
-COPY --from=build /target/*.jar app.jar
+COPY --from=build /target/app.jar app.jar
 EXPOSE 8081
 ENTRYPOINT ["java","-jar","/app.jar"]
