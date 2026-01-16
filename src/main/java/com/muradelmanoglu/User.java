@@ -1,3 +1,4 @@
+package com.muradelmanoglu;
 
 import java.io.Serializable;
 

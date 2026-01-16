@@ -1,4 +1,4 @@
-
+package com.muradelmanoglu;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
